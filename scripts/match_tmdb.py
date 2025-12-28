@@ -2,8 +2,15 @@
 
 import json
 import os
+import sys
 import time
-import requests
+
+# ==========================================================
+# FIX PYTHON PATH (CI / GITHUB ACTIONS)
+# ==========================================================
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, ROOT_DIR)
 
 from utils.normalizer import TitleNormalizer
 from utils.similarity import TitleSimilarity
@@ -16,7 +23,6 @@ from utils.tmdb_client import TMDBClient
 INPUT_FILE = "data/processed/anilist_normalized.json"
 OUTPUT_FILE = "data/processed/animes_matched.json"
 
-TMDB_SEARCH_URL = "https://api.themoviedb.org/3/search/multi"
 SCORE_THRESHOLD = 0.75
 DELAY_BETWEEN_REQUESTS = 0.25
 
@@ -26,29 +32,6 @@ DELAY_BETWEEN_REQUESTS = 0.25
 
 def log(msg, level="INFO"):
     print(f"[MATCH][{level}] {msg}")
-
-# ==========================================================
-# TMDB SEARCH (MULTI)
-# ==========================================================
-
-def search_tmdb(query: str, headers: dict):
-    params = {
-        "query": query,
-        "include_adult": False,
-        "language": "en-US"
-    }
-
-    response = requests.get(
-        TMDB_SEARCH_URL,
-        headers=headers,
-        params=params,
-        timeout=15
-    )
-
-    if response.status_code != 200:
-        return []
-
-    return response.json().get("results", [])
 
 # ==========================================================
 # MATCHING
@@ -63,12 +46,12 @@ def find_best_match(anime: dict, client: TMDBClient) -> dict:
         titles.get("romaji"),
         titles.get("native")
     ]
-
     search_titles = [t for t in search_titles if t]
 
     for title in search_titles:
         log(f"Buscando TMDB: {title}")
-        results = search_tmdb(title, client._headers())
+
+        results = client.search_multi(title)
 
         for r in results:
             media_type = r.get("media_type")
@@ -76,8 +59,10 @@ def find_best_match(anime: dict, client: TMDBClient) -> dict:
                 continue
 
             tmdb_title = r.get("name") or r.get("title")
-            tmdb_title_norm = TitleNormalizer.normalize(tmdb_title)
+            if not tmdb_title:
+                continue
 
+            tmdb_title_norm = TitleNormalizer.normalize(tmdb_title)
             score = TitleSimilarity.score(title, tmdb_title_norm)
 
             candidates.append({
@@ -128,7 +113,8 @@ def main():
     matched = 0
 
     for i, anime in enumerate(animes, 1):
-        log(f"[{i}/{total}] {anime.get('titles', {}).get('romaji')}")
+        title = anime.get("titles", {}).get("romaji") or "Sem título"
+        log(f"[{i}/{total}] {title}")
 
         result = find_best_match(anime, client)
         anime["match"] = result
