@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Anime Database Schema",
+  "type": "object",
+  "required": [
+    "anilist_id",
+    "titles",
+    "format",
+    "status",
+    "episodes",
+    "year",
+    "genres",
+    "anilist_score",
+    "match"
+  ],
+  "properties": {
+    "anilist_id": {
+      "type": "integer"
+    },
+
+    "titles": {
+      "type": "object",
+      "required": ["romaji"],
+      "properties": {
+        "romaji": { "type": "string" },
+        "english": { "type": ["string", "null"] },
+        "native": { "type": ["string", "null"] }
+      }
+    },
+
+    "format": {
+      "type": "string"
+    },
+
+    "status": {
+      "type": "string"
+    },
+
+    "episodes": {
+      "type": ["integer", "null"]
+    },
+
+    "year": {
+      "type": ["integer", "null"]
+    },
+
+    "genres": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+
+    "anilist_score": {
+      "type": ["number", "null"]
+    },
+
+    "tmdb": {
+      "type": ["object", "null"],
+      "required": ["id", "media_type"],
+      "properties": {
+        "id": { "type": "integer" },
+        "media_type": { "type": "string" },
+        "original_language": { "type": "string" },
+        "original_name": { "type": ["string", "null"] },
+        "first_air_date": { "type": ["string", "null"] },
+        "year": { "type": ["integer", "null"] },
+        "number_of_seasons": { "type": ["integer", "null"] },
+        "number_of_episodes": { "type": ["integer", "null"] },
+        "vote_average": { "type": ["number", "null"] },
+        "vote_count": { "type": ["integer", "null"] },
+        "popularity": { "type": ["number", "null"] },
+        "status": { "type": ["string", "null"] },
+        "genres": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+
+    "tmdb_localized": {
+      "type": ["object", "null"],
+      "properties": {
+        "language": { "type": "string" },
+        "title": { "type": ["string", "null"] },
+        "overview": { "type": ["string", "null"] },
+        "tagline": { "type": ["string", "null"] },
+        "poster": { "type": ["string", "null"] },
+        "backdrop": { "type": ["string", "null"] }
+      }
+    },
+
+    "tmdb_fallback": {
+      "type": ["object", "null"],
+      "properties": {
+        "language": { "type": "string" },
+        "title": { "type": ["string", "null"] },
+        "overview": { "type": ["string", "null"] },
+        "tagline": { "type": ["string", "null"] }
+      }
+    },
+
+    "match": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["MATCHED", "NOT_MATCHED", "NOT_FOUND"]
+        },
+        "method": { "type": ["string", "null"] },
+        "score": { "type": ["number", "null"] },
+        "tmdb_id": { "type": ["integer", "null"] },
+        "media_type": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "additionalProperties": false
+}
