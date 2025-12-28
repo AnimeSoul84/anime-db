@@ -86,7 +86,7 @@ def fetch_page(page: int) -> Dict:
 
 def fetch_all_animes() -> List[Dict]:
     page = 1
-    all_animes = []
+    all_animes: List[Dict] = []
 
     log("Iniciando coleta completa do AniList")
 
@@ -123,6 +123,11 @@ def save_json(data: List[Dict]):
 
 
 def main():
+    # ✅ NÃO refaz se já existir
+    if os.path.exists(OUTPUT_FILE):
+        log("Arquivo anilist_raw.json já existe, pulando coleta.")
+        return
+
     animes = fetch_all_animes()
     save_json(animes)
 
