@@ -6,13 +6,23 @@ import time
 import requests
 from typing import List, Dict
 
+# ==========================================================
+# PATHS (CORRIGIDO)
+# ==========================================================
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+OUTPUT_FILE = os.path.join(BASE_DIR, "data", "raw", "anilist_raw.json")
+
+# ==========================================================
+# API
+# ==========================================================
+
 ANILIST_API = "https://graphql.anilist.co"
-OUTPUT_FILE = "data/raw/anilist_raw.json"
 
 HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
-    "User-Agent": "anime-db-bot/1.0 (https://github.com/AnimeSoul84/anime-db)"
+    "User-Agent": "anime-db-bot/1.0 (https://github.com/AnimeSoul84/anime-db)",
 }
 
 QUERY = """
@@ -44,15 +54,21 @@ query ($page: Int) {
 }
 """
 
+# ==========================================================
+# LOG
+# ==========================================================
 
 def log(msg: str):
     print(f"[AniList] {msg}")
 
+# ==========================================================
+# FETCH
+# ==========================================================
 
 def fetch_page(page: int) -> Dict:
     payload = {
         "query": QUERY,
-        "variables": {"page": page}
+        "variables": {"page": page},
     }
 
     wait = 2
@@ -62,14 +78,12 @@ def fetch_page(page: int) -> Dict:
             ANILIST_API,
             json=payload,
             headers=HEADERS,
-            timeout=30
+            timeout=30,
         )
 
-        # ✅ sucesso
         if response.status_code == 200:
             return response.json()
 
-        # ⏳ rate limit
         if response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
             delay = int(retry_after) if retry_after else wait
@@ -78,11 +92,13 @@ def fetch_page(page: int) -> Dict:
             wait = min(wait * 2, 60)
             continue
 
-        # ❌ erro real
         log(f"Erro HTTP {response.status_code} na página {page}")
         time.sleep(wait)
         wait = min(wait * 2, 60)
 
+# ==========================================================
+# COLLECT
+# ==========================================================
 
 def fetch_all_animes() -> List[Dict]:
     page = 1
@@ -107,10 +123,13 @@ def fetch_all_animes() -> List[Dict]:
             break
 
         page += 1
-        time.sleep(0.8)  # seguro para CI
+        time.sleep(0.8)
 
     return all_animes
 
+# ==========================================================
+# SAVE
+# ==========================================================
 
 def save_json(data: List[Dict]):
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
@@ -121,16 +140,17 @@ def save_json(data: List[Dict]):
     log(f"Arquivo salvo em: {OUTPUT_FILE}")
     log(f"Total final de animes: {len(data)}")
 
+# ==========================================================
+# MAIN
+# ==========================================================
 
 def main():
-    # ✅ NÃO refaz se já existir
     if os.path.exists(OUTPUT_FILE):
         log("Arquivo anilist_raw.json já existe, pulando coleta.")
         return
 
     animes = fetch_all_animes()
     save_json(animes)
-
 
 if __name__ == "__main__":
     main()
