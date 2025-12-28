@@ -13,7 +13,7 @@ from utils.tmdb_client import TMDBClient
 # CONFIG
 # ==========================================================
 
-INPUT_FILE = "data/raw/anilist_raw.json"
+INPUT_FILE = "data/processed/anilist_normalized.json"
 OUTPUT_FILE = "data/processed/animes_matched.json"
 
 TMDB_SEARCH_URL = "https://api.themoviedb.org/3/search/multi"
