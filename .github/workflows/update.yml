@@ -49,19 +49,29 @@ jobs:
       # PIPELINE
       # ==================================================
       - name: Fetch AniList
-        run: python scripts/fetch_anilist.py
+        run: |
+          export PYTHONPATH=.
+          python scripts/fetch_anilist.py
 
       - name: Normalize titles
-        run: python scripts/normalize_titles.py
+        run: |
+          export PYTHONPATH=.
+          python scripts/normalize_titles.py
 
       - name: Match TMDB
-        run: python scripts/match_tmdb.py
+        run: |
+          export PYTHONPATH=.
+          python scripts/match_tmdb.py
 
       - name: Enrich TMDB
-        run: python scripts/enrich_tmdb.py
+        run: |
+          export PYTHONPATH=.
+          python scripts/enrich_tmdb.py
 
       - name: Export JSON
-        run: python scripts/export_json.py
+        run: |
+          export PYTHONPATH=.
+          python scripts/export_json.py
 
       # ==================================================
       # COMMIT & PUSH
