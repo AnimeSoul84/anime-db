@@ -24,7 +24,7 @@ INPUT_FILE = "data/processed/anilist_normalized.json"
 OUTPUT_FILE = "data/processed/animes_matched.json"
 
 SCORE_THRESHOLD = 0.75
-DELAY_BETWEEN_REQUESTS = 0.25
+DELAY_BETWEEN_REQUESTS = 0.1  # 🔥 reduzido (seguro com 5 tokens)
 
 # ==========================================================
 # LOG
@@ -41,17 +41,21 @@ def find_best_match(anime: dict, client: TMDBClient) -> dict:
     titles = anime.get("_normalized", {})
     candidates = []
 
-    search_titles = [
-        titles.get("english"),
-        titles.get("romaji"),
-        titles.get("native")
-    ]
-    search_titles = [t for t in search_titles if t]
+    # 🔥 prioridade correta (menos buscas)
+    search_titles = []
+
+    if titles.get("english"):
+        search_titles.append(titles["english"])
+    elif titles.get("romaji"):
+        search_titles.append(titles["romaji"])
+
+    if not search_titles and titles.get("native"):
+        search_titles.append(titles["native"])
 
     for title in search_titles:
         log(f"Buscando TMDB: {title}")
 
-        results = client.search_multi(title)
+        results = client.search_multi(title)[:5]  # 🔥 limita resultados
 
         for r in results:
             media_type = r.get("media_type")
@@ -65,19 +69,27 @@ def find_best_match(anime: dict, client: TMDBClient) -> dict:
             tmdb_title_norm = TitleNormalizer.normalize(tmdb_title)
             score = TitleSimilarity.score(title, tmdb_title_norm)
 
+            # 🔥 match forte → sai na hora
+            if score >= 0.92:
+                return {
+                    "status": "MATCHED",
+                    "tmdb_id": r.get("id"),
+                    "media_type": media_type,
+                    "method": "title_similarity_fast",
+                    "score": round(score, 3),
+                }
+
             candidates.append({
                 "tmdb_id": r.get("id"),
                 "media_type": media_type,
                 "title": tmdb_title,
-                "score": score
+                "score": score,
             })
 
         time.sleep(DELAY_BETWEEN_REQUESTS)
 
     if not candidates:
-        return {
-            "status": "NOT_FOUND"
-        }
+        return {"status": "NOT_FOUND"}
 
     best = max(candidates, key=lambda x: x["score"])
 
@@ -87,13 +99,13 @@ def find_best_match(anime: dict, client: TMDBClient) -> dict:
             "tmdb_id": best["tmdb_id"],
             "media_type": best["media_type"],
             "method": "title_similarity",
-            "score": round(best["score"], 3)
+            "score": round(best["score"], 3),
         }
 
     return {
         "status": "NOT_MATCHED",
         "method": "title_similarity",
-        "score": round(best["score"], 3)
+        "score": round(best["score"], 3),
     }
 
 # ==========================================================
