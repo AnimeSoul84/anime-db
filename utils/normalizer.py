@@ -2,10 +2,10 @@
 
 import re
 import unicodedata
-from typing import Optional
+from typing import Optional, Dict
 
 # ==========================================================
-# PALAVRAS INÚTEIS (STOPWORDS)
+# STOPWORDS
 # ==========================================================
 
 STOPWORDS = {
@@ -27,54 +27,29 @@ STOPWORDS = {
 class TitleNormalizer:
     @staticmethod
     def normalize(title: Optional[str]) -> Optional[str]:
-        """
-        Normaliza um título para comparação.
-        Retorna string limpa ou None.
-        """
         if not title:
             return None
 
-        # --------------------------
-        # lowercase
-        # --------------------------
         text = title.lower()
 
-        # --------------------------
-        # remover acentos (latin)
-        # --------------------------
+        # remove acentos (latin)
         text = unicodedata.normalize("NFKD", text)
-        text = "".join(
-            c for c in text
-            if not unicodedata.combining(c)
-        )
+        text = "".join(c for c in text if not unicodedata.combining(c))
 
-        # --------------------------
-        # remover símbolos (mantém japonês)
-        # --------------------------
+        # remove símbolos (mantém japonês)
         text = re.sub(r"[^\w\s\u3040-\u30ff\u4e00-\u9faf]", " ", text)
 
-        # --------------------------
-        # remover stopwords
-        # --------------------------
-        words = []
-        for word in text.split():
-            if word not in STOPWORDS:
-                words.append(word)
-
+        # remove stopwords
+        words = [w for w in text.split() if w not in STOPWORDS]
         text = " ".join(words)
 
-        # --------------------------
-        # normalizar espaços
-        # --------------------------
+        # normaliza espaços
         text = re.sub(r"\s+", " ", text).strip()
 
-        return text if text else None
+        return text or None
 
     @staticmethod
-    def normalize_all(titles: dict) -> dict:
-        """
-        Normaliza múltiplos títulos (romaji, english, native).
-        """
+    def normalize_all(titles: Dict[str, Optional[str]]) -> Dict[str, Optional[str]]:
         return {
             key: TitleNormalizer.normalize(value)
             for key, value in titles.items()
