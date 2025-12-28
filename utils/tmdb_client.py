@@ -4,7 +4,7 @@ import os
 import time
 import requests
 import itertools
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 TMDB_API_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/"
@@ -82,11 +82,15 @@ class TMDBClient:
         return None
 
     # ======================================================
-    # SEARCH
+    # SEARCH (CORRIGIDO)
     # ======================================================
 
-    def search_multi(self, query: str, language: str = "en-US") -> Optional[Dict]:
-        return self._request(
+    def search_multi(self, query: str, language: str = "en-US") -> List[Dict]:
+        """
+        Retorna SEMPRE uma lista de resultados.
+        Nunca retorna dict.
+        """
+        data = self._request(
             "/search/multi",
             params={
                 "query": query,
@@ -94,6 +98,11 @@ class TMDBClient:
                 "language": language,
             },
         )
+
+        if not data or "results" not in data:
+            return []
+
+        return data["results"]
 
     # ======================================================
     # API METHODS
