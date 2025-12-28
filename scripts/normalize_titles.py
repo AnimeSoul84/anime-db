@@ -2,6 +2,14 @@
 
 import json
 import os
+import sys
+
+# ==========================================================
+# FIX PYTHON PATH (CI / GITHUB ACTIONS)
+# ==========================================================
+
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, ROOT_DIR)
 
 from utils.normalizer import TitleNormalizer
 
@@ -51,9 +59,7 @@ def main():
 
     log(f"Normalizando títulos de {len(animes)} animes...")
 
-    normalized = []
-    for anime in animes:
-        normalized.append(normalize_anime(anime))
+    normalized = [normalize_anime(anime) for anime in animes]
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
