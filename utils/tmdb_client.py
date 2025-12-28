@@ -82,6 +82,20 @@ class TMDBClient:
         return None
 
     # ======================================================
+    # SEARCH
+    # ======================================================
+
+    def search_multi(self, query: str, language: str = "en-US") -> Optional[Dict]:
+        return self._request(
+            "/search/multi",
+            params={
+                "query": query,
+                "include_adult": False,
+                "language": language,
+            },
+        )
+
+    # ======================================================
     # API METHODS
     # ======================================================
 
@@ -152,8 +166,8 @@ class TMDBClient:
                 continue
 
             for v in videos.get("results", []):
-                if v["site"] == "YouTube" and v["type"] == "Trailer":
-                    return v["key"]
+                if v.get("site") == "YouTube" and v.get("type") == "Trailer":
+                    return v.get("key")
         return None
 
     # ======================================================
