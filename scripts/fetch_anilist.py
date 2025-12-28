@@ -4,7 +4,7 @@ import os
 import json
 import time
 import requests
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 ANILIST_API = "https://graphql.anilist.co"
 
@@ -15,7 +15,10 @@ HEADERS = {
     "Accept": "application/json"
 }
 
-# GraphQL query completa e segura
+# ==========================================================
+# GRAPHQL QUERY
+# ==========================================================
+
 QUERY = """
 query ($page: Int) {
   Page(page: $page, perPage: 50) {
@@ -46,18 +49,26 @@ query ($page: Int) {
 }
 """
 
+# ==========================================================
+# LOG
+# ==========================================================
 
 def log(msg: str):
     print(f"[AniList] {msg}")
 
+# ==========================================================
+# FETCH PAGE (COM BACKOFF E RATE LIMIT)
+# ==========================================================
 
-def fetch_page(page: int) -> Dict:
+def fetch_page(page: int) -> Optional[Dict]:
     payload = {
         "query": QUERY,
         "variables": {"page": page}
     }
 
-    for attempt in range(3):
+    delay = 2
+
+    for attempt in range(1, 6):  # até 5 tentativas
         try:
             response = requests.post(
                 ANILIST_API,
@@ -65,23 +76,41 @@ def fetch_page(page: int) -> Dict:
                 headers=HEADERS,
                 timeout=30
             )
+
+            # Rate limit
+            if response.status_code == 429:
+                log(f"Rate limit na página {page}, aguardando {delay}s...")
+                time.sleep(delay)
+                delay *= 2
+                continue
+
             response.raise_for_status()
             return response.json()
+
         except Exception as e:
-            log(f"Erro na página {page} (tentativa {attempt + 1}/3): {e}")
-            time.sleep(2)
+            log(f"Erro página {page} ({attempt}/5): {e}")
+            time.sleep(delay)
+            delay *= 2
 
-    raise RuntimeError(f"Falha definitiva ao buscar página {page}")
+    log(f"❌ Pulando página {page} após múltiplas falhas")
+    return None
 
+# ==========================================================
+# FETCH ALL
+# ==========================================================
 
 def fetch_all_animes() -> List[Dict]:
     page = 1
-    all_animes = []
+    all_animes: List[Dict] = []
 
     log("Iniciando coleta completa do AniList")
 
     while True:
         data = fetch_page(page)
+
+        if not data:
+            page += 1
+            continue
 
         page_info = data["data"]["Page"]["pageInfo"]
         media = data["data"]["Page"]["media"]
@@ -97,10 +126,13 @@ def fetch_all_animes() -> List[Dict]:
             break
 
         page += 1
-        time.sleep(0.6)  # respeita a API
+        time.sleep(1.2)  # seguro para GitHub Actions
 
     return all_animes
 
+# ==========================================================
+# SAVE
+# ==========================================================
 
 def save_json(data: List[Dict]):
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
@@ -111,11 +143,13 @@ def save_json(data: List[Dict]):
     log(f"Arquivo salvo em: {OUTPUT_FILE}")
     log(f"Total final de animes: {len(data)}")
 
+# ==========================================================
+# MAIN
+# ==========================================================
 
 def main():
     animes = fetch_all_animes()
     save_json(animes)
-
 
 if __name__ == "__main__":
     main()
