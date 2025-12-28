@@ -10,25 +10,7 @@ TMDB_API_BASE = "https://api.themoviedb.org/3"
 TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/"
 
 # ==========================================================
-# TOKENS V4 (ROTATION)
-# ==========================================================
-
-TOKENS = [
-    os.getenv("TMDB_TOKEN_1"),
-    os.getenv("TMDB_TOKEN_2"),
-    os.getenv("TMDB_TOKEN_3"),
-    os.getenv("TMDB_TOKEN_4"),
-    os.getenv("TMDB_TOKEN_5"),
-]
-
-TOKENS = [t for t in TOKENS if t]
-TOKEN_CYCLE = itertools.cycle(TOKENS)
-
-if not TOKENS:
-    raise RuntimeError("❌ Nenhum TMDB_TOKEN encontrado no ambiente")
-
-# ==========================================================
-# LOGGING (SIMPLES, LIMPO, PROFISSIONAL)
+# LOG
 # ==========================================================
 
 def log(msg: str, level: str = "INFO"):
@@ -43,8 +25,32 @@ class TMDBClient:
         self.timeout = timeout
         self.retries = retries
 
+        tokens = [
+            os.getenv("TMDB_TOKEN_1"),
+            os.getenv("TMDB_TOKEN_2"),
+            os.getenv("TMDB_TOKEN_3"),
+            os.getenv("TMDB_TOKEN_4"),
+            os.getenv("TMDB_TOKEN_5"),
+        ]
+
+        self.tokens = [t for t in tokens if t]
+
+        if not self.tokens:
+            raise RuntimeError(
+                "❌ Nenhum TMDB_TOKEN encontrado. "
+                "Configure TMDB_TOKEN_1..5 como secrets no GitHub Actions."
+            )
+
+        self._token_cycle = itertools.cycle(self.tokens)
+
+        log(f"{len(self.tokens)} tokens TMDB carregados")
+
+    # ======================================================
+    # REQUEST
+    # ======================================================
+
     def _headers(self) -> Dict[str, str]:
-        token = next(TOKEN_CYCLE)
+        token = next(self._token_cycle)
         return {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json;charset=utf-8",
@@ -76,58 +82,40 @@ class TMDBClient:
         return None
 
     # ======================================================
-    # DADOS PRINCIPAIS (FILME / SÉRIE)
+    # API METHODS
     # ======================================================
 
     def get_details(self, tmdb_id: int, media_type: str, language: str) -> Optional[Dict]:
-        endpoint = f"/{media_type}/{tmdb_id}"
-        return self._request(endpoint, params={"language": language})
+        return self._request(f"/{media_type}/{tmdb_id}", {"language": language})
 
     def get_videos(self, tmdb_id: int, media_type: str, language: str) -> Optional[Dict]:
-        endpoint = f"/{media_type}/{tmdb_id}/videos"
-        return self._request(endpoint, params={"language": language})
+        return self._request(f"/{media_type}/{tmdb_id}/videos", {"language": language})
 
     # ======================================================
-    # ENRIQUECIMENTO COMPLETO
+    # ENRICH
     # ======================================================
 
     def enrich(self, tmdb_id: int, media_type: str) -> Dict[str, Any]:
         log(f"Enriquecendo {media_type.upper()} ID={tmdb_id}")
 
-        # -------------------------
-        # GLOBAL (en-US)
-        # -------------------------
         global_data = self.get_details(tmdb_id, media_type, "en-US")
         if not global_data:
-            log("Dados globais não encontrados", "ERROR")
             return {}
 
         enriched = {
-            "tmdb": self._parse_global(global_data, media_type)
+            "tmdb": self._parse_global(global_data, media_type),
+            "tmdb_fallback": self._parse_localized(global_data, "en-US"),
         }
 
-        # -------------------------
-        # PT-BR
-        # -------------------------
-        pt_data = self.get_details(tmdb_id, media_type, "pt-BR")
-        if pt_data and pt_data.get("overview"):
-            enriched["tmdb_localized"] = self._parse_localized(pt_data, "pt-BR")
-        else:
-            enriched["tmdb_localized"] = None
+        pt = self.get_details(tmdb_id, media_type, "pt-BR")
+        enriched["tmdb_localized"] = (
+            self._parse_localized(pt, "pt-BR") if pt and pt.get("overview") else None
+        )
 
-        # -------------------------
-        # FALLBACK en-US
-        # -------------------------
-        enriched["tmdb_fallback"] = self._parse_localized(global_data, "en-US")
-
-        # -------------------------
-        # TRAILER
-        # -------------------------
         trailer = self._get_trailer(tmdb_id, media_type)
         if trailer:
             enriched["tmdb"]["trailer"] = trailer
 
-        log(f"✔ Enriquecimento concluído ID={tmdb_id}")
         return enriched
 
     # ======================================================
@@ -140,10 +128,7 @@ class TMDBClient:
             "media_type": media_type,
             "original_language": data.get("original_language"),
             "original_name": data.get("original_name") or data.get("original_title"),
-            "first_air_date": data.get("first_air_date") or data.get("release_date"),
             "year": self._extract_year(data),
-            "number_of_seasons": data.get("number_of_seasons"),
-            "number_of_episodes": data.get("number_of_episodes"),
             "vote_average": data.get("vote_average"),
             "vote_count": data.get("vote_count"),
             "popularity": data.get("popularity"),
@@ -156,7 +141,6 @@ class TMDBClient:
             "language": language,
             "title": data.get("name") or data.get("title"),
             "overview": data.get("overview"),
-            "tagline": data.get("tagline"),
             "poster": self._img(data.get("poster_path"), "w500"),
             "backdrop": self._img(data.get("backdrop_path"), "w780"),
         }
@@ -170,7 +154,6 @@ class TMDBClient:
             for v in videos.get("results", []):
                 if v["site"] == "YouTube" and v["type"] == "Trailer":
                     return v["key"]
-
         return None
 
     # ======================================================
@@ -180,12 +163,8 @@ class TMDBClient:
     @staticmethod
     def _extract_year(data: Dict) -> Optional[int]:
         date = data.get("first_air_date") or data.get("release_date")
-        if date and len(date) >= 4:
-            return int(date[:4])
-        return None
+        return int(date[:4]) if date else None
 
     @staticmethod
     def _img(path: Optional[str], size: str) -> Optional[str]:
-        if not path:
-            return None
-        return f"{TMDB_IMAGE_BASE}{size}{path}"
+        return f"{TMDB_IMAGE_BASE}{size}{path}" if path else None
