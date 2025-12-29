@@ -4,28 +4,16 @@ import os
 import json
 import time
 import requests
-from typing import List, Dict
-
-# ==========================================================
-# PATHS (FIX DEFINITIVO PARA GITHUB ACTIONS)
-# ==========================================================
-
-# raiz do repositório (Actions) ou cwd (local)
-BASE_DIR = os.environ.get("GITHUB_WORKSPACE", os.getcwd())
-
-OUTPUT_DIR = os.path.join(BASE_DIR, "data", "raw")
-OUTPUT_FILE = os.path.join(OUTPUT_DIR, "anilist_raw.json")
-
-# ==========================================================
-# API
-# ==========================================================
 
 ANILIST_API = "https://graphql.anilist.co"
+
+OUTPUT_DIR = "data/raw"
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "anilist_raw.json")
 
 HEADERS = {
     "Content-Type": "application/json",
     "Accept": "application/json",
-    "User-Agent": "anime-db-bot/1.0 (https://github.com/AnimeSoul84/anime-db)",
+    "User-Agent": "anime-db-github-action",
 }
 
 QUERY = """
@@ -38,126 +26,81 @@ query ($page: Int) {
     }
     media(type: ANIME, isAdult: false) {
       id
+      format
+      status
+      episodes
+      startDate { year }
+      genres
+      averageScore
+      popularity
       title {
         romaji
         english
         native
       }
-      format
-      status
-      episodes
-      startDate {
-        year
-      }
-      genres
-      averageScore
-      popularity
     }
   }
 }
 """
 
-# ==========================================================
-# LOG
-# ==========================================================
-
-def log(msg: str):
+def log(msg):
     print(f"[AniList] {msg}")
 
-# ==========================================================
-# FETCH
-# ==========================================================
-
-def fetch_page(page: int) -> Dict:
-    payload = {
-        "query": QUERY,
-        "variables": {"page": page},
-    }
-
-    wait = 2
-
-    while True:
-        response = requests.post(
+def request(payload, retries=6):
+    for attempt in range(retries):
+        r = requests.post(
             ANILIST_API,
-            json=payload,
             headers=HEADERS,
+            json=payload,
             timeout=30,
         )
 
-        if response.status_code == 200:
-            return response.json()
+        if r.status_code == 200:
+            return r.json()
 
-        if response.status_code == 429:
-            retry_after = response.headers.get("Retry-After")
-            delay = int(retry_after) if retry_after else wait
-            log(f"Rate limit na página {page}, aguardando {delay}s...")
-            time.sleep(delay)
-            wait = min(wait * 2, 60)
+        if r.status_code == 429:
+            wait = 10 * (attempt + 1)
+            log(f"Rate limit 429 — aguardando {wait}s")
+            time.sleep(wait)
             continue
 
-        log(f"Erro HTTP {response.status_code} na página {page}")
-        time.sleep(wait)
-        wait = min(wait * 2, 60)
+        r.raise_for_status()
 
-# ==========================================================
-# COLLECT
-# ==========================================================
+    raise RuntimeError("AniList rate limit persistente")
 
-def fetch_all_animes() -> List[Dict]:
+def fetch_all():
     page = 1
-    all_animes: List[Dict] = []
-
-    log("Iniciando coleta completa do AniList")
+    results = []
 
     while True:
-        data = fetch_page(page)
+        log(f"Coletando página {page}")
 
-        page_info = data["data"]["Page"]["pageInfo"]
-        media = data["data"]["Page"]["media"]
+        data = request({
+            "query": QUERY,
+            "variables": {"page": page},
+        })
 
-        all_animes.extend(media)
+        page_data = data["data"]["Page"]
+        results.extend(page_data["media"])
 
-        log(
-            f"Página {page_info['currentPage']} / {page_info['lastPage']} "
-            f"| Total coletado: {len(all_animes)}"
-        )
-
-        if not page_info["hasNextPage"]:
+        if not page_data["pageInfo"]["hasNextPage"]:
             break
 
         page += 1
         time.sleep(0.8)
 
-    return all_animes
-
-# ==========================================================
-# SAVE
-# ==========================================================
-
-def save_json(data: List[Dict]):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-    log(f"Arquivo salvo em: {OUTPUT_FILE}")
-    log(f"Total final de animes: {len(data)}")
-
-# ==========================================================
-# MAIN
-# ==========================================================
+    return results
 
 def main():
-    log(f"GITHUB_WORKSPACE: {os.environ.get('GITHUB_WORKSPACE')}")
-    log(f"CWD: {os.getcwd()}")
-    log(f"OUTPUT_FILE: {OUTPUT_FILE}")
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    if os.path.exists(OUTPUT_FILE):
-        log("Arquivo anilist_raw.json já existe, pulando coleta.")
-        return
+    animes = fetch_all()
 
-    animes = fetch_all_animes()
-    save_json(animes)
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(animes, f, ensure_ascii=False, indent=2)
+
+    log(f"Arquivo salvo: {OUTPUT_FILE}")
+    log(f"Total coletado: {len(animes)}")
 
 if __name__ == "__main__":
     main()
