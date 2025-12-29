@@ -7,11 +7,14 @@ import requests
 from typing import List, Dict
 
 # ==========================================================
-# PATHS (FIX DEFINITIVO)
+# PATHS (FIX DEFINITIVO PARA GITHUB ACTIONS)
 # ==========================================================
 
-# ✅ sempre relativo à raiz do repositório
-OUTPUT_FILE = "data/raw/anilist_raw.json"
+# raiz do repositório (Actions) ou cwd (local)
+BASE_DIR = os.environ.get("GITHUB_WORKSPACE", os.getcwd())
+
+OUTPUT_DIR = os.path.join(BASE_DIR, "data", "raw")
+OUTPUT_FILE = os.path.join(OUTPUT_DIR, "anilist_raw.json")
 
 # ==========================================================
 # API
@@ -132,8 +135,7 @@ def fetch_all_animes() -> List[Dict]:
 # ==========================================================
 
 def save_json(data: List[Dict]):
-    # ✅ cria dentro do repo
-    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
@@ -146,6 +148,10 @@ def save_json(data: List[Dict]):
 # ==========================================================
 
 def main():
+    log(f"GITHUB_WORKSPACE: {os.environ.get('GITHUB_WORKSPACE')}")
+    log(f"CWD: {os.getcwd()}")
+    log(f"OUTPUT_FILE: {OUTPUT_FILE}")
+
     if os.path.exists(OUTPUT_FILE):
         log("Arquivo anilist_raw.json já existe, pulando coleta.")
         return
