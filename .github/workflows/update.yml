@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      # ✅ FIX DEFINITIVO PARA IMPORTS (utils, etc)
+      # ✅ FIX DEFINITIVO PARA IMPORTS (utils, scripts, etc)
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
@@ -51,6 +51,10 @@ jobs:
 
       - name: Enrich TMDB
         run: python scripts/enrich_tmdb.py
+
+      # 🧠 NOVO PASSO — aplica mapper + valida schema
+      - name: Map & Validate Schema
+        run: python scripts/mapper.py
 
       - name: Export JSON
         run: python scripts/export_json.py
