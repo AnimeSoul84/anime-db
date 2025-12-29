@@ -5,6 +5,12 @@ on:
     - cron: "0 6 * * 1"   # Segunda-feira 06:00 UTC
   workflow_dispatch:
 
+# ==================================================
+# PERMISSÕES (OBRIGATÓRIO PARA git push)
+# ==================================================
+permissions:
+  contents: write
+
 jobs:
   update-db:
     runs-on: ubuntu-latest
