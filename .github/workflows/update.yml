@@ -36,30 +36,33 @@ jobs:
           echo "TMDB_TOKEN_4=${{ secrets.TMDB_TOKEN_4 }}" >> $GITHUB_ENV
           echo "TMDB_TOKEN_5=${{ secrets.TMDB_TOKEN_5 }}" >> $GITHUB_ENV
 
+      # ==========================
+      # FETCH ANILIST
+      # ==========================
       - name: Fetch AniList
-        working-directory: ${{ github.workspace }}
         run: python scripts/fetch_anilist.py
 
       - name: Normalize titles
-        working-directory: ${{ github.workspace }}
         run: python scripts/normalize_titles.py
 
       - name: Match TMDB
-        working-directory: ${{ github.workspace }}
         run: python scripts/match_tmdb.py
 
       - name: Enrich TMDB
-        working-directory: ${{ github.workspace }}
         run: python scripts/enrich_tmdb.py
 
       - name: Export JSON
-        working-directory: ${{ github.workspace }}
         run: python scripts/export_json.py
 
+      # ==========================
+      # COMMIT
+      # ==========================
       - name: Commit changes
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+
+          git status
 
           if ! git diff --quiet; then
             git add data/
