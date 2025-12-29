@@ -7,11 +7,11 @@ import requests
 from typing import List, Dict
 
 # ==========================================================
-# PATHS (CORRIGIDO)
+# PATHS (FIX DEFINITIVO)
 # ==========================================================
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUTPUT_FILE = os.path.join(BASE_DIR, "data", "raw", "anilist_raw.json")
+# ✅ sempre relativo à raiz do repositório
+OUTPUT_FILE = "data/raw/anilist_raw.json"
 
 # ==========================================================
 # API
@@ -132,7 +132,8 @@ def fetch_all_animes() -> List[Dict]:
 # ==========================================================
 
 def save_json(data: List[Dict]):
-    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
+    # ✅ cria dentro do repo
+    os.makedirs("data/raw", exist_ok=True)
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
