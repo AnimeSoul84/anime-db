@@ -10,7 +10,7 @@ from typing import List, Dict
 # PATHS (CORRIGIDO)
 # ==========================================================
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OUTPUT_FILE = os.path.join(BASE_DIR, "data", "raw", "anilist_raw.json")
 
 # ==========================================================
