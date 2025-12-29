@@ -4,6 +4,7 @@ import os
 import json
 import time
 import requests
+from typing import List, Dict, Any
 
 ANILIST_API = "https://graphql.anilist.co"
 
@@ -43,34 +44,79 @@ query ($page: Int) {
 }
 """
 
-def log(msg):
+# ==========================================================
+# LOG
+# ==========================================================
+
+def log(msg: str):
     print(f"[AniList] {msg}")
 
-def request(payload, retries=6):
-    for attempt in range(retries):
-        r = requests.post(
-            ANILIST_API,
-            headers=HEADERS,
-            json=payload,
-            timeout=30,
-        )
+# ==========================================================
+# REQUEST
+# ==========================================================
 
-        if r.status_code == 200:
-            return r.json()
+def request(payload: Dict[str, Any], retries: int = 6) -> Dict[str, Any]:
+    for attempt in range(1, retries + 1):
+        try:
+            r = requests.post(
+                ANILIST_API,
+                headers=HEADERS,
+                json=payload,
+                timeout=30,
+            )
 
-        if r.status_code == 429:
-            wait = 10 * (attempt + 1)
-            log(f"Rate limit 429 — aguardando {wait}s")
-            time.sleep(wait)
-            continue
+            if r.status_code == 200:
+                return r.json()
 
-        r.raise_for_status()
+            if r.status_code == 429:
+                wait = 10 * attempt
+                log(f"Rate limit 429 — aguardando {wait}s")
+                time.sleep(wait)
+                continue
 
-    raise RuntimeError("AniList rate limit persistente")
+            r.raise_for_status()
 
-def fetch_all():
+        except requests.RequestException as e:
+            log(f"Erro de rede ({attempt}/{retries}): {e}")
+            time.sleep(5 * attempt)
+
+    raise RuntimeError("❌ AniList indisponível após múltiplas tentativas")
+
+# ==========================================================
+# NORMALIZE RAW
+# ==========================================================
+
+def normalize_media(media: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "anilist_id": media.get("id"),
+
+        "titles": {
+            "romaji": media.get("title", {}).get("romaji"),
+            "english": media.get("title", {}).get("english"),
+            "native": media.get("title", {}).get("native"),
+        },
+
+        "format": media.get("format"),
+        "status": media.get("status"),
+        "episodes": media.get("episodes"),
+        "year": media.get("startDate", {}).get("year"),
+        "genres": media.get("genres", []),
+        "anilist_score": media.get("averageScore"),
+        "popularity": media.get("popularity"),
+
+        # reservado para etapas futuras
+        "match": {
+            "status": "NOT_FOUND"
+        }
+    }
+
+# ==========================================================
+# FETCH ALL
+# ==========================================================
+
+def fetch_all() -> List[Dict[str, Any]]:
     page = 1
-    results = []
+    results: List[Dict[str, Any]] = []
 
     while True:
         log(f"Coletando página {page}")
@@ -80,16 +126,24 @@ def fetch_all():
             "variables": {"page": page},
         })
 
-        page_data = data["data"]["Page"]
-        results.extend(page_data["media"])
+        page_data = data.get("data", {}).get("Page")
+        if not page_data:
+            raise RuntimeError("Resposta inválida da AniList")
 
-        if not page_data["pageInfo"]["hasNextPage"]:
+        for media in page_data.get("media", []):
+            results.append(normalize_media(media))
+
+        if not page_data.get("pageInfo", {}).get("hasNextPage"):
             break
 
         page += 1
         time.sleep(0.8)
 
     return results
+
+# ==========================================================
+# MAIN
+# ==========================================================
 
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -99,8 +153,8 @@ def main():
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(animes, f, ensure_ascii=False, indent=2)
 
-    log(f"Arquivo salvo: {OUTPUT_FILE}")
-    log(f"Total coletado: {len(animes)}")
+    log(f"✔ Arquivo salvo: {OUTPUT_FILE}")
+    log(f"✔ Total coletado: {len(animes)}")
 
 if __name__ == "__main__":
     main()

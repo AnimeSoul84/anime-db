@@ -29,20 +29,36 @@ def log(msg, level="INFO"):
 
 _tmdb_cache: Dict[str, dict] = {}
 
+def cache_key(tmdb_id: int, media_type: str) -> str:
+    return f"{media_type}:{tmdb_id}"
+
 def get_cached(tmdb_id: int, media_type: str):
-    return _tmdb_cache.get(f"{media_type}:{tmdb_id}")
+    return _tmdb_cache.get(cache_key(tmdb_id, media_type))
 
 def set_cached(tmdb_id: int, media_type: str, data: dict):
-    _tmdb_cache[f"{media_type}:{tmdb_id}"] = data
+    _tmdb_cache[cache_key(tmdb_id, media_type)] = data
+
+# ==========================================================
+# HELPERS
+# ==========================================================
+
+def get_display_title(anime: dict) -> str:
+    return (
+        anime.get("titles", {}).get("english")
+        or anime.get("titles", {}).get("romaji")
+        or anime.get("titles", {}).get("native")
+        or f"AniList ID {anime.get('id', '?')}"
+    )
 
 # ==========================================================
 # ENRICHMENT
 # ==========================================================
 
 def enrich_anime(anime: dict, client: TMDBClient) -> dict:
-    match = anime.get("match", {})
+    match = anime.get("match") or {}
 
-    if match.get("status") != "MATCHED":
+    status = match.get("status")
+    if status != "MATCHED":
         anime["tmdb"] = None
         anime["tmdb_localized"] = None
         anime["tmdb_fallback"] = None
@@ -51,20 +67,28 @@ def enrich_anime(anime: dict, client: TMDBClient) -> dict:
     tmdb_id = match.get("tmdb_id")
     media_type = match.get("media_type")
 
-    if not tmdb_id or not media_type:
-        log("Match inválido, pulando", "WARN")
+    if not tmdb_id or media_type not in ("tv", "movie"):
+        log(f"Match inválido (id={tmdb_id}, type={media_type})", "WARN")
         anime["tmdb"] = None
         return anime
 
-    cache = get_cached(tmdb_id, media_type)
-    if cache:
-        anime.update(cache)
+    # ======================================================
+    # CACHE
+    # ======================================================
+
+    cached = get_cached(tmdb_id, media_type)
+    if cached:
+        anime.update(cached)
         return anime
+
+    # ======================================================
+    # TMDB ENRICH
+    # ======================================================
 
     try:
         data = client.enrich(tmdb_id, media_type)
 
-        if not data or "tmdb" not in data:
+        if not data or not data.get("tmdb"):
             log(f"Falha ao enriquecer TMDB ID={tmdb_id}", "WARN")
             anime["tmdb"] = None
             return anime
@@ -73,7 +97,6 @@ def enrich_anime(anime: dict, client: TMDBClient) -> dict:
         anime["tmdb_localized"] = data.get("tmdb_localized")
         anime["tmdb_fallback"] = data.get("tmdb_fallback")
 
-        # salva no cache
         set_cached(
             tmdb_id,
             media_type,
@@ -87,7 +110,7 @@ def enrich_anime(anime: dict, client: TMDBClient) -> dict:
         return anime
 
     except Exception as e:
-        log(f"Erro inesperado TMDB ID={tmdb_id}: {e}", "ERROR")
+        log(f"Erro TMDB ID={tmdb_id}: {e}", "ERROR")
         anime["tmdb"] = None
         anime["tmdb_localized"] = None
         anime["tmdb_fallback"] = None
@@ -110,7 +133,7 @@ def main():
     enriched = 0
 
     for i, anime in enumerate(animes, 1):
-        title = anime.get("titles", {}).get("romaji", "???")
+        title = get_display_title(anime)
         log(f"[{i}/{total}] {title}")
 
         enrich_anime(anime, client)

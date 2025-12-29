@@ -5,10 +5,6 @@ import os
 import sys
 import time
 
-# ==========================================================
-# FIX PYTHON PATH (CI / GITHUB ACTIONS)
-# ==========================================================
-
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT_DIR)
 
@@ -20,11 +16,12 @@ from utils.tmdb_client import TMDBClient
 # CONFIG
 # ==========================================================
 
-INPUT_FILE = "data/processed/anilist_normalized.json"
+INPUT_FILE = "data/processed/anilist_mapped.json"
 OUTPUT_FILE = "data/processed/animes_matched.json"
 
 SCORE_THRESHOLD = 0.75
-DELAY_BETWEEN_REQUESTS = 0.1  # 🔥 reduzido (seguro com 5 tokens)
+FAST_MATCH_THRESHOLD = 0.92
+DELAY_BETWEEN_REQUESTS = 0.1
 
 # ==========================================================
 # LOG
@@ -34,28 +31,42 @@ def log(msg, level="INFO"):
     print(f"[MATCH][{level}] {msg}")
 
 # ==========================================================
+# HELPERS
+# ==========================================================
+
+def get_display_title(anime: dict) -> str:
+    titles = anime.get("_normalized", {})
+    return (
+        titles.get("english")
+        or titles.get("romaji")
+        or titles.get("native")
+        or f"AniList {anime['anilist_id']}"
+    )
+
+def get_search_titles(anime: dict) -> list[str]:
+    titles = anime.get("_normalized", {})
+    search = []
+
+    if titles.get("english"):
+        search.append(titles["english"])
+    if titles.get("romaji") and titles["romaji"] not in search:
+        search.append(titles["romaji"])
+    if titles.get("native") and titles["native"] not in search:
+        search.append(titles["native"])
+
+    return search
+
+# ==========================================================
 # MATCHING
 # ==========================================================
 
 def find_best_match(anime: dict, client: TMDBClient) -> dict:
-    titles = anime.get("_normalized", {})
     candidates = []
 
-    # 🔥 prioridade correta (menos buscas)
-    search_titles = []
-
-    if titles.get("english"):
-        search_titles.append(titles["english"])
-    elif titles.get("romaji"):
-        search_titles.append(titles["romaji"])
-
-    if not search_titles and titles.get("native"):
-        search_titles.append(titles["native"])
-
-    for title in search_titles:
+    for title in get_search_titles(anime):
         log(f"Buscando TMDB: {title}")
 
-        results = client.search_multi(title)[:5]  # 🔥 limita resultados
+        results = client.search_multi(title)[:5]
 
         for r in results:
             media_type = r.get("media_type")
@@ -69,18 +80,17 @@ def find_best_match(anime: dict, client: TMDBClient) -> dict:
             tmdb_title_norm = TitleNormalizer.normalize(tmdb_title)
             score = TitleSimilarity.score(title, tmdb_title_norm)
 
-            # 🔥 match forte → sai na hora
-            if score >= 0.92:
+            if score >= FAST_MATCH_THRESHOLD:
                 return {
                     "status": "MATCHED",
-                    "tmdb_id": r.get("id"),
+                    "tmdb_id": r["id"],
                     "media_type": media_type,
                     "method": "title_similarity_fast",
                     "score": round(score, 3),
                 }
 
             candidates.append({
-                "tmdb_id": r.get("id"),
+                "tmdb_id": r["id"],
                 "media_type": media_type,
                 "title": tmdb_title,
                 "score": score,
@@ -119,34 +129,29 @@ def main():
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         animes = json.load(f)
 
-    client = TMDBClient()
+    # normalize titles
+    for anime in animes:
+        anime["_normalized"] = TitleNormalizer.normalize_all(anime["titles"])
 
-    total = len(animes)
+    client = TMDBClient()
     matched = 0
 
     for i, anime in enumerate(animes, 1):
-        title = anime.get("titles", {}).get("romaji") or "Sem título"
-        log(f"[{i}/{total}] {title}")
+        log(f"[{i}/{len(animes)}] {get_display_title(anime)}")
 
         result = find_best_match(anime, client)
         anime["match"] = result
 
-        if result.get("status") == "MATCHED":
-            anime["tmdb_id"] = result["tmdb_id"]
-            anime["media_type"] = result["media_type"]
+        if result["status"] == "MATCHED":
             matched += 1
 
-    log(f"✔ MATCHED: {matched}/{total}")
+    log(f"✔ MATCHED: {matched}/{len(animes)}")
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(animes, f, ensure_ascii=False, indent=2)
 
     log(f"Arquivo salvo em {OUTPUT_FILE}")
-
-# ==========================================================
-# ENTRYPOINT
-# ==========================================================
 
 if __name__ == "__main__":
     main()

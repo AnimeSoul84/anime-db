@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from typing import Dict
 
 # ==========================================================
 # FIX PYTHON PATH (CI / GITHUB ACTIONS)
@@ -24,17 +25,18 @@ OUTPUT_FILE = "data/processed/anilist_normalized.json"
 # LOG
 # ==========================================================
 
-def log(msg, level="INFO"):
+def log(msg: str, level: str = "INFO"):
     print(f"[NORMALIZE][{level}] {msg}")
 
 # ==========================================================
 # NORMALIZATION
 # ==========================================================
 
-def normalize_anime(anime: dict) -> dict:
-    titles = anime.get("title") or anime.get("titles")
+def normalize_anime(anime: Dict) -> Dict:
+    titles = anime.get("titles")
 
-    if not titles:
+    if not isinstance(titles, dict):
+        log(f"AniList ID {anime.get('anilist_id')} sem titles", "WARN")
         anime["_normalized"] = {}
         return anime
 
@@ -59,11 +61,12 @@ def main():
 
     log(f"Normalizando títulos de {len(animes)} animes...")
 
-    normalized = [normalize_anime(anime) for anime in animes]
+    for anime in animes:
+        normalize_anime(anime)
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(normalized, f, ensure_ascii=False, indent=2)
+        json.dump(animes, f, ensure_ascii=False, indent=2)
 
     log(f"✔ Arquivo salvo em {OUTPUT_FILE}")
 

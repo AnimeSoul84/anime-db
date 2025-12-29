@@ -11,9 +11,9 @@ from jsonschema import validate, ValidationError
 INPUT_FILE = "data/processed/animes_enriched.json"
 SCHEMA_FILE = "schemas/anime.schema.json"
 
-OUT_ENRICHED = "data/processed/animes_enriched.json"
-OUT_NO_TMDB = "data/processed/animes_no_tmdb.json"
-OUT_NOT_MATCHED = "data/processed/animes_not_matched.json"
+OUT_ENRICHED = "data/final/animes_enriched.json"
+OUT_NO_TMDB = "data/final/animes_no_tmdb.json"
+OUT_NOT_MATCHED = "data/final/animes_not_matched.json"
 
 INDEX_ANILIST = "data/indexes/by_anilist_id.json"
 INDEX_TMDB = "data/indexes/by_tmdb_id.json"
@@ -23,7 +23,7 @@ INDEX_TMDB = "data/indexes/by_tmdb_id.json"
 # ==========================================================
 
 def log(msg, level="INFO"):
-    print(f"[EXPORT][{level}] {msg}")
+    print(f"[MAPPER][{level}] {msg}")
 
 # ==========================================================
 # HELPERS
@@ -63,22 +63,30 @@ def main():
     for anime in animes:
         anime = clean_temporary_fields(anime)
 
-        match_status = anime.get("match", {}).get("status")
+        match = anime.get("match", {})
+        status = match.get("status")
 
-        try:
-            validate_anime(anime, schema)
-        except ValidationError as e:
-            log(f"Schema inválido (AniList ID {anime.get('anilist_id')}): {e.message}", "ERROR")
-            raise
-
-        if match_status != "MATCHED":
+        # ❌ Nunca valida NOT_MATCHED contra schema final
+        if status != "MATCHED":
             not_matched.append(anime)
             continue
 
-        if anime.get("tmdb"):
-            enriched.append(anime)
-        else:
+        # MATCHED mas sem TMDB
+        if not anime.get("tmdb"):
             no_tmdb.append(anime)
+            continue
+
+        # ✅ Agora sim valida schema
+        try:
+            validate_anime(anime, schema)
+        except ValidationError as e:
+            log(
+                f"Schema inválido (AniList ID {anime.get('anilist_id')}): {e.message}",
+                "ERROR",
+            )
+            raise
+
+        enriched.append(anime)
 
     # ======================================================
     # SAVE FILES
@@ -90,7 +98,7 @@ def main():
     save_json(OUT_NOT_MATCHED, not_matched)
 
     # ======================================================
-    # INDEXES
+    # INDEXES (APENAS ENRICHED)
     # ======================================================
 
     log("Gerando indexes...")
@@ -99,8 +107,7 @@ def main():
     index_tmdb = {}
 
     for i, anime in enumerate(enriched):
-        anilist_id = str(anime["anilist_id"])
-        index_anilist[anilist_id] = i
+        index_anilist[str(anime["anilist_id"])] = i
 
         tmdb = anime.get("tmdb")
         if tmdb and tmdb.get("id"):
@@ -113,9 +120,9 @@ def main():
     # SUMMARY
     # ======================================================
 
-    log("✔ EXPORT FINALIZADO")
-    log(f"✔ Enriquecidos: {len(enriched)}")
-    log(f"⚠ Sem TMDB: {len(no_tmdb)}")
+    log("✔ MAPPER FINALIZADO")
+    log(f"✔ Enriquecidos (válidos): {len(enriched)}")
+    log(f"⚠ MATCHED sem TMDB: {len(no_tmdb)}")
     log(f"❌ Não match: {len(not_matched)}")
 
 # ==========================================================
