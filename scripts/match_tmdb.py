@@ -16,7 +16,7 @@ from utils.tmdb_client import TMDBClient
 # CONFIG
 # ==========================================================
 
-INPUT_FILE = "data/processed/anilist_mapped.json"
+INPUT_FILE = "data/processed/anilist_normalized.json"
 OUTPUT_FILE = "data/processed/animes_matched.json"
 
 SCORE_THRESHOLD = 0.75
