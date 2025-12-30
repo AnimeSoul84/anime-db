@@ -28,7 +28,7 @@
       }
     },
 
-    "format": { "type": ["string", "null"] }
+    "format": { "type": ["string", "null"] },
     "status": { "type": "string" },
     "episodes": { "type": ["integer", "null"] },
     "year": { "type": ["integer", "null"] },
