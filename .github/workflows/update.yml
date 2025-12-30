@@ -44,6 +44,10 @@ jobs:
       - name: Fetch AniList
         run: python scripts/fetch_anilist.py
 
+      # 🐞 DEBUG — confirma que o arquivo foi criado
+      - name: Debug data folder (after fetch)
+        run: ls -R data
+
       # 2️⃣ MAP + VALIDATE BASE SCHEMA
       - name: Map & Validate Schema
         run: python scripts/mapper.py
@@ -63,6 +67,10 @@ jobs:
       # 6️⃣ EXPORT FINAL
       - name: Export JSON
         run: python scripts/export_json.py
+
+      # 🐞 DEBUG FINAL
+      - name: Debug data folder (final)
+        run: ls -R data
 
       # 7️⃣ COMMIT
       - name: Commit changes
