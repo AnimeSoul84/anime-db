@@ -27,21 +27,17 @@ def log(msg, level="INFO"):
 
 def map_anime(raw: dict) -> dict:
     return {
-        "anilist_id": raw.get("id"),
-        "titles": {
-            "romaji": raw.get("title", {}).get("romaji"),
-            "english": raw.get("title", {}).get("english"),
-            "native": raw.get("title", {}).get("native"),
-        },
+        "anilist_id": raw.get("anilist_id"),  # ✅ AQUI ESTÁ O FIX
+        "titles": raw.get("titles", {}),
         "format": raw.get("format"),
         "status": raw.get("status"),
         "episodes": raw.get("episodes"),
-        "year": raw.get("startDate", {}).get("year"),
+        "year": raw.get("year"),
         "genres": raw.get("genres", []),
-        "anilist_score": raw.get("averageScore"),
-        "match": {"status": "NOT_PROCESSED"}
-    }
-
+        "anilist_score": raw.get("anilist_score"),
+        "popularity": raw.get("popularity"),
+        "match": raw.get("match", {"status": "NOT_PROCESSED"}),
+}
 # ==========================================================
 # MAIN
 # ==========================================================
