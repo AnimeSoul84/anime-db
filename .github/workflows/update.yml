@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      # ✅ FIX DEFINITIVO PARA IMPORTS (utils, scripts, etc)
+      # ✅ PYTHONPATH
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
@@ -40,25 +40,31 @@ jobs:
           echo "TMDB_TOKEN_4=${{ secrets.TMDB_TOKEN_4 }}" >> $GITHUB_ENV
           echo "TMDB_TOKEN_5=${{ secrets.TMDB_TOKEN_5 }}" >> $GITHUB_ENV
 
+      # 1️⃣ FETCH
       - name: Fetch AniList
         run: python scripts/fetch_anilist.py
 
-      - name: Normalize titles
-        run: python scripts/normalize_titles.py
-
-      - name: Match TMDB
-        run: python scripts/match_tmdb.py
-
-      - name: Enrich TMDB
-        run: python scripts/enrich_tmdb.py
-
-      # 🧠 NOVO PASSO — aplica mapper + valida schema
+      # 2️⃣ MAP + VALIDATE BASE SCHEMA
       - name: Map & Validate Schema
         run: python scripts/mapper.py
 
+      # 3️⃣ NORMALIZE TITLES
+      - name: Normalize titles
+        run: python scripts/normalize_titles.py
+
+      # 4️⃣ MATCH TMDB
+      - name: Match TMDB
+        run: python scripts/match_tmdb.py
+
+      # 5️⃣ ENRICH TMDB
+      - name: Enrich TMDB
+        run: python scripts/enrich_tmdb.py
+
+      # 6️⃣ EXPORT FINAL
       - name: Export JSON
         run: python scripts/export_json.py
 
+      # 7️⃣ COMMIT
       - name: Commit changes
         run: |
           git config user.name "github-actions"
