@@ -18,7 +18,7 @@ from utils.normalizer import TitleNormalizer
 # CONFIG
 # ==========================================================
 
-INPUT_FILE = "data/raw/anilist_raw.json"
+INPUT_FILE = "data/processed/anilist_mapped.json"
 OUTPUT_FILE = "data/processed/anilist_normalized.json"
 
 # ==========================================================
