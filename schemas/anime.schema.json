@@ -29,10 +29,6 @@
     },
 
     "format": { "type": ["string", "null"] },
-<<<<<<< HEAD
-=======
-
->>>>>>> 1538743 (Fix schema JSON and update workflow)
     "status": { "type": "string" },
     "episodes": { "type": ["integer", "null"] },
     "year": { "type": ["integer", "null"] },
