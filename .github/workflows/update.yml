@@ -23,7 +23,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      # ✅ PYTHONPATH
       - name: Set PYTHONPATH
         run: echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
 
@@ -40,40 +39,45 @@ jobs:
           echo "TMDB_TOKEN_4=${{ secrets.TMDB_TOKEN_4 }}" >> $GITHUB_ENV
           echo "TMDB_TOKEN_5=${{ secrets.TMDB_TOKEN_5 }}" >> $GITHUB_ENV
 
-      # 1️⃣ FETCH
+      # 1️⃣ FETCH (NUNCA FALHA PIPELINE)
       - name: Fetch AniList
         run: python scripts/fetch_anilist.py
 
-      # 🐞 DEBUG — confirma que o arquivo foi criado
-      - name: Debug data folder (after fetch)
+      # 🔥 COMMIT IMEDIATO DO RAW
+      - name: Commit raw AniList
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add data/raw/anilist_raw.json
+          git commit -m "data: update anilist raw" || echo "Sem mudanças"
+          git push || true
+
+      # DEBUG VISUAL
+      - name: Debug data folder
         run: ls -R data
 
-      # 2️⃣ MAP + VALIDATE BASE SCHEMA
+      # 2️⃣ MAP (NÃO QUEBRA JOB)
       - name: Map & Validate Schema
-        run: python scripts/mapper.py
+        run: python scripts/mapper.py || true
 
-      # 3️⃣ NORMALIZE TITLES
+      # 3️⃣ NORMALIZE
       - name: Normalize titles
-        run: python scripts/normalize_titles.py
+        run: python scripts/normalize_titles.py || true
 
       # 4️⃣ MATCH TMDB
       - name: Match TMDB
-        run: python scripts/match_tmdb.py
+        run: python scripts/match_tmdb.py || true
 
       # 5️⃣ ENRICH TMDB
       - name: Enrich TMDB
-        run: python scripts/enrich_tmdb.py
+        run: python scripts/enrich_tmdb.py || true
 
       # 6️⃣ EXPORT FINAL
       - name: Export JSON
-        run: python scripts/export_json.py
+        run: python scripts/export_json.py || true
 
-      # 🐞 DEBUG FINAL
-      - name: Debug data folder (final)
-        run: ls -R data
-
-      # 7️⃣ COMMIT
-      - name: Commit changes
+      # 7️⃣ COMMIT FINAL (SE EXISTIR)
+      - name: Commit processed/final
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"

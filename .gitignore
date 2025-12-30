@@ -1,0 +1,6 @@
+# Dados gerados
+data/raw/*.json
+
+# Cache Python
+__pycache__/
+*.pyc
