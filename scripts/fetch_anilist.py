@@ -6,6 +6,10 @@ import time
 import requests
 from typing import List, Dict, Any
 
+# ==========================================================
+# CONFIG
+# ==========================================================
+
 ANILIST_API = "https://graphql.anilist.co"
 
 OUTPUT_DIR = "data/raw"
@@ -48,11 +52,11 @@ query ($page: Int) {
 # LOG
 # ==========================================================
 
-def log(msg: str):
-    print(f"[AniList] {msg}")
+def log(msg: str, level: str = "INFO"):
+    print(f"[AniList][{level}] {msg}")
 
 # ==========================================================
-# REQUEST
+# REQUEST (COM RETRY + RATE LIMIT)
 # ==========================================================
 
 def request(payload: Dict[str, Any], retries: int = 6) -> Dict[str, Any]:
@@ -70,41 +74,50 @@ def request(payload: Dict[str, Any], retries: int = 6) -> Dict[str, Any]:
 
             if r.status_code == 429:
                 wait = 10 * attempt
-                log(f"Rate limit 429 — aguardando {wait}s")
+                log(f"Rate limit 429 — aguardando {wait}s", "WARN")
                 time.sleep(wait)
                 continue
 
             r.raise_for_status()
 
         except requests.RequestException as e:
-            log(f"Erro de rede ({attempt}/{retries}): {e}")
+            log(f"Erro de rede ({attempt}/{retries}): {e}", "ERROR")
             time.sleep(5 * attempt)
 
     raise RuntimeError("❌ AniList indisponível após múltiplas tentativas")
 
 # ==========================================================
-# NORMALIZE RAW
+# NORMALIZE RAW (BLINDADO)
 # ==========================================================
 
 def normalize_media(media: Dict[str, Any]) -> Dict[str, Any]:
+    title = media.get("title") or {}
+
+    romaji = title.get("romaji") or ""
+    english = title.get("english")
+    native = title.get("native")
+
     return {
+        # obrigatório
         "anilist_id": media.get("id"),
 
         "titles": {
-            "romaji": media.get("title", {}).get("romaji"),
-            "english": media.get("title", {}).get("english"),
-            "native": media.get("title", {}).get("native"),
+            "romaji": romaji,               # NUNCA null
+            "english": english,
+            "native": native,
         },
 
+        # AniList pode retornar null → schema aceita
         "format": media.get("format"),
         "status": media.get("status"),
         "episodes": media.get("episodes"),
-        "year": media.get("startDate", {}).get("year"),
-        "genres": media.get("genres", []),
+        "year": (media.get("startDate") or {}).get("year"),
+
+        "genres": media.get("genres") or [],
         "anilist_score": media.get("averageScore"),
         "popularity": media.get("popularity"),
 
-        # reservado para etapas futuras
+        # placeholder para pipeline
         "match": {
             "status": "NOT_FOUND"
         }
@@ -130,7 +143,9 @@ def fetch_all() -> List[Dict[str, Any]]:
         if not page_data:
             raise RuntimeError("Resposta inválida da AniList")
 
-        for media in page_data.get("media", []):
+        media_list = page_data.get("media") or []
+
+        for media in media_list:
             results.append(normalize_media(media))
 
         if not page_data.get("pageInfo", {}).get("hasNextPage"):
@@ -148,6 +163,7 @@ def fetch_all() -> List[Dict[str, Any]]:
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
+    log("Iniciando coleta do AniList...")
     animes = fetch_all()
 
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
