@@ -1,5 +1,5 @@
 # Dados gerados
-data/raw/*.json
+# data/raw/*.json
 
 # Cache Python
 __pycache__/
