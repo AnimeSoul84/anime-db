@@ -1,5 +1,5 @@
-# Dados gerados
-# data/raw/*.json
+# Dados brutos (não versionar)
+data/raw/
 
 # Cache Python
 __pycache__/
