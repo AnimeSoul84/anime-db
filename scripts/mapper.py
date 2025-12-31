@@ -5,6 +5,12 @@ import os
 from jsonschema import validate, ValidationError
 
 # ==========================================================
+# CONFIG
+# ==========================================================
+
+VALIDATE = False  # ⚠️ Termux = False | GitHub Actions = True
+
+# ==========================================================
 # PATHS
 # ==========================================================
 
@@ -19,7 +25,7 @@ SCHEMA_FILE = os.path.join(ROOT_DIR, "schemas", "anime.schema.json")
 # ==========================================================
 
 def log(msg, level="INFO"):
-    print(f"[MAPPER][{level}] {msg}")
+    print(f"[MAPPER][{level}] {msg}", flush=True)
 
 # ==========================================================
 # MAPPER
@@ -27,7 +33,7 @@ def log(msg, level="INFO"):
 
 def map_anime(raw: dict) -> dict:
     return {
-        "anilist_id": raw.get("anilist_id"),  # ✅ AQUI ESTÁ O FIX
+        "anilist_id": raw.get("anilist_id"),
         "titles": raw.get("titles", {}),
         "format": raw.get("format"),
         "status": raw.get("status"),
@@ -37,36 +43,49 @@ def map_anime(raw: dict) -> dict:
         "anilist_score": raw.get("anilist_score"),
         "popularity": raw.get("popularity"),
         "match": raw.get("match", {"status": "NOT_PROCESSED"}),
-}
+    }
+
 # ==========================================================
 # MAIN
 # ==========================================================
 
 def main():
+    log("Carregando AniList raw")
+
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         raw_animes = json.load(f)
 
-    with open(SCHEMA_FILE, "r", encoding="utf-8") as f:
-        schema = json.load(f)
+    schema = None
+    if VALIDATE:
+        log("Carregando schema")
+        with open(SCHEMA_FILE, "r", encoding="utf-8") as f:
+            schema = json.load(f)
 
     mapped = []
 
-    for anime in raw_animes:
+    for i, anime in enumerate(raw_animes, start=1):
         mapped_anime = map_anime(anime)
 
-        try:
-            validate(instance=mapped_anime, schema=schema)
-        except ValidationError as e:
-            log(f"Schema inválido para AniList {anime.get('id')}: {e.message}", "ERROR")
-            continue
+        if VALIDATE:
+            try:
+                validate(instance=mapped_anime, schema=schema)
+            except ValidationError as e:
+                log(
+                    f"Schema inválido para AniList {anime.get('anilist_id')}: {e.message}",
+                    "ERROR"
+                )
+                continue
 
         mapped.append(mapped_anime)
+
+        if i % 500 == 0:
+            log(f"Processados: {i}")
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         json.dump(mapped, f, ensure_ascii=False, indent=2)
 
-    log(f"✔ Mapeados e validados: {len(mapped)}")
+    log(f"✔ Mapeados: {len(mapped)}")
 
 if __name__ == "__main__":
     main()
