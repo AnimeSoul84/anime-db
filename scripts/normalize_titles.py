@@ -15,18 +15,23 @@ sys.path.insert(0, ROOT_DIR)
 from utils.normalizer import TitleNormalizer
 
 # ==========================================================
-# CONFIG
+# CONFIG (PATH CORRETO)
 # ==========================================================
 
-INPUT_FILE = "data/processed/anilist_mapped.json"
-OUTPUT_FILE = "data/processed/anilist_normalized.json"
+INPUT_FILE = os.path.join(
+    ROOT_DIR, "data", "processed", "anilist_mapped.json"
+)
+
+OUTPUT_FILE = os.path.join(
+    ROOT_DIR, "data", "processed", "anilist_normalized.json"
+)
 
 # ==========================================================
 # LOG
 # ==========================================================
 
 def log(msg: str, level: str = "INFO"):
-    print(f"[NORMALIZE][{level}] {msg}")
+    print(f"[NORMALIZE][{level}] {msg}", flush=True)
 
 # ==========================================================
 # NORMALIZATION
@@ -61,8 +66,11 @@ def main():
 
     log(f"Normalizando títulos de {len(animes)} animes...")
 
-    for anime in animes:
+    for i, anime in enumerate(animes, start=1):
         normalize_anime(anime)
+
+        if i % 500 == 0:
+            log(f"Processados: {i}")
 
     os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
